@@ -1,227 +1,190 @@
-# 🏥 MediBook — Hospital Appointment Booking System
+# 🏥 Hospital Appointment System (Dockerized)
 
-A Spring Boot + MySQL + Thymeleaf web application for booking hospital appointments, containerized with Docker and deployed on Kubernetes (kubeadm).
-
----
-
-## 🛠️ Tech Stack
-
-| Layer       | Technology                        |
-|-------------|-----------------------------------|
-| Backend     | Spring Boot 3.3.4, Spring Data JPA|
-| Frontend    | Thymeleaf, HTML/CSS               |
-| Database    | MySQL 8.0                         |
-| Container   | Docker (multi-stage build)        |
-| Orchestration | Kubernetes (kubeadm)            |
+A **Spring Boot + MySQL** based Hospital Appointment application fully containerized using Docker and Docker Compose with proper service orchestration.
 
 ---
 
-## 📦 Project Structure
+# 🚀 Tech Stack
+
+* **Backend:** Java, Spring Boot
+* **Database:** MySQL
+* **Build Tool:** Maven
+* **Containerization:** Docker
+* **Orchestration:** Docker Compose
+
+---
+
+# 📁 Project Structure
 
 ```
-hospital-appointment/
-├── src/main/java/com/hospital/
-│   ├── entity/          # Patient, Doctor, Appointment
-│   ├── repository/      # JPA repositories
-│   ├── service/         # Service interfaces + implementations
-│   └── controller/      # HomeController, AdminController
-├── src/main/resources/
-│   ├── templates/       # Thymeleaf HTML pages
-│   └── application.properties
-├── kube_scripts/
-│   ├── db-statefulset-svc.yml   # MySQL StatefulSet + ClusterIP Service
-│   ├── app-deploy-svc.yml       # Spring Boot Deployment + NodePort Service
-│   └── setup-storage.sh         # Creates hostPath PV for MySQL
+.
 ├── Dockerfile
-├── docker_build_push.sh
-└── k8s-deploy.sh
+├── docker-compose.yml
+├── wait-for-it.sh
+├── pom.xml
+├── src/
+└── README.md
 ```
 
 ---
 
-## 🔑 Roles
+# ⚙️ Prerequisites
 
-| Role    | Login                      | Access                                            |
-|---------|----------------------------|-------------------------------------------- ------|
-| Admin   | admin / admin              | Dashboard, manage doctors, patients, appointments |
-| Patient | registered email/password  | Book appointments, view & cancel own appointments |
+Make sure you have installed:
 
----
+* Docker
+* Docker Compose
 
-## ▶️ Running Locally
+Verify installation:
 
-### Prerequisites
-- Java 17, Maven, MySQL running locally
-
-### Steps
-```bash
-# 1. Update application.properties to point to localhost
-spring.datasource.url=jdbc:mysql://localhost:3306/hospitaldb?createDatabaseIfNotExist=true
-
-# 2. Build and run
-./mvnw spring-boot:run
 ```
-
-Access at: **http://localhost:8085**
-
----
-
-## 🐳 Docker
-
-```bash
-# Build image
-docker build -t your_dockerhub_username/hospital-appointment:latest .
-
-# Run with Docker (needs MySQL container)
-docker network create hospital-net
-
-docker run -d --name mysql-service --network hospital-net \
-  -e MYSQL_ROOT_PASSWORD=1234 \
-  -e MYSQL_DATABASE=hospitaldb \
-  mysql:8.0
-
-docker run -d --name hospital-app --network hospital-net \
-  -p 8085:8085 \
-  your_dockerhub_username/hospital-appointment:latest
-
-# Or use the build+push script
-bash docker_build_push.sh
+docker --version
+docker compose version
 ```
 
 ---
 
-## ☸️ Kubernetes (kubeadm)
+# 🐳 How to Run the Application
 
-```bash
-# Update image name in kube_scripts/app-deploy-svc.yml first, then:
-bash k8s-deploy.sh
+## 1️⃣ Clone the Repository
+
 ```
-
-App will be available at: **http://\<NodeIP\>:30085**
-
-### Useful kubectl commands
-```bash
-kubectl get pods
-kubectl get svc
-kubectl logs deployment/hospital-appointment
-kubectl describe pod <pod-name>
+git clone <your-repo-url>
+cd hospital-appointment
 ```
 
 ---
 
-## 🗄️ Entities
+## 2️⃣ Download Wait Script (IMPORTANT)
 
-- **Patient** — fullName, email, phone, gender, age, password
-- **Doctor**  — fullName, specialization, qualification, phone, email, availableDays, availableTime
-- **Appointment** — date, time, reason, status (PENDING/CONFIRMED/CANCELLED), FK to Patient & Doctor
+```
+curl -o wait-for-it.sh https://raw.githubusercontent.com/vishnubob/wait-for-it/master/wait-for-it.sh
+```
 
 ---
 
-## 📊 Monitoring Setup (Prometheus + Grafana)
-**Add Dependencies**
-```bash
-<dependency>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-starter-actuator</artifactId>
-</dependency>
+## 3️⃣ Build and Run Containers
 
-<dependency>
-    <groupId>io.micrometer</groupId>
-    <artifactId>micrometer-registry-prometheus</artifactId>
-</dependency>
+```
+docker compose up --build
 ```
 
-**Enable Metrics**
-```bash
-management.endpoints.web.exposure.include=*
-management.endpoint.prometheus.enabled=true
-management.metrics.export.prometheus.enabled=true
+---
+
+## 4️⃣ Access the Application
+
+Open in browser:
+
+```
+http://localhost:8085
 ```
 
-**Verify Metrics**
-```bash
-http://<APP_SERVER_IP>:30085/actuator/prometheus
+---
+
+# 🗄️ Database Configuration
+
+| Property | Value |
+| -------- | ----- |
+| Host     | db    |
+| Port     | 3306  |
+| Database | mydb  |
+| Username | root  |
+| Password | root  |
+
+---
+
+# 🔄 Application Flow
+
+1. MySQL container starts
+2. Database initializes
+3. `wait-for-it.sh` waits for DB readiness
+4. Spring Boot app starts
+5. App connects to MySQL
+6. Application becomes available
+
+---
+
+# 📦 Useful Commands
+
+## Start application
+
+```
+docker compose up --build
 ```
 
-**Prometheus Configuration**
-```bash
-global:
-  scrape_interval: 15s
+## Run in background
 
-scrape_configs:
-  - job_name: 'spring-boot-app'
-    metrics_path: '/actuator/prometheus'
-    static_configs:
-      - targets: ['<APP_SERVER_IP>:30085']
 ```
-## Prometheus Queries
-```bash
-up{job="spring-boot-app"}
-```
-```bash
-http_server_requests_seconds_count
-```
-```bash
-rate(http_server_requests_seconds_count[1m])
-```
-```bash
-jvm_memory_used_bytes
-```
-```bash
-jvm_threads_live_threads
+docker compose up -d --build
 ```
 
-**Node Exporter Configuration**
-```bash
-global:
-  scrape_interval: 15s
+## Stop application
 
-scrape_configs:
-  - job_name: 'prometheus'
-    static_configs:
-      - targets: ['localhost:9090']
-
-  - job_name: 'node-exporter'
-    static_configs:
-      - targets: ['<APP_SERVER_IP>:9100']
-
-  - job_name: 'spring-boot-app'
-    metrics_path: '/actuator/prometheus'
-    static_configs:
-      - targets: ['<APP_SERVER_IP>:30085']
+```
+docker compose down
 ```
 
-## Grafana Dashboard Queries
+## Remove volumes (reset DB)
 
-**Requests Per Second**
-```bash
-sum(rate(http_server_requests_seconds_count{job="spring-boot-app", uri!="/actuator/prometheus"}[1m]))
 ```
-**Active Requests**
-```bash
-sum(http_server_requests_active_seconds_count{job="spring-boot-app"})
-```
-**Average Response Time**
-```bash
-sum(rate(http_server_requests_seconds_sum{job="spring-boot-app"}[1m])) /
-sum(rate(http_server_requests_seconds_count{job="spring-boot-app"}[1m]))
-```
-**Error Rate**
-```bash
-sum(rate(http_server_requests_seconds_count{job="spring-boot-app", status!~"2.."}[1m]))
-```
-**JVM Heap Memory**
-```bash
-sum(jvm_memory_used_bytes{area="heap", job="spring-boot-app"})
-```
-**95th Percentile Latency**
-```bash
-histogram_quantile(0.95,
-  sum(rate(http_server_requests_seconds_bucket{job="spring-boot-app"}[5m])) by (le)
-)
+docker compose down -v
 ```
 
-🔄 Monitoring Flow
-```bash
-Spring Boot → Actuator → Prometheus → Grafana
+## View logs
+
 ```
+docker compose logs -f
+```
+
+---
+
+# ⚠️ Common Issues & Fixes
+
+## ❌ Database connection error
+
+* Ensure MySQL is running
+* Check DB URL uses `db` (not localhost)
+
+---
+
+## ❌ Port not accessible
+
+* Ensure:
+
+```
+server.port=8085
+```
+
+---
+
+## ❌ Container crashes
+
+Check logs:
+
+```
+docker logs java-app
+```
+
+---
+
+# 🧠 Key Concepts
+
+* Service name (`db`) acts as hostname
+* Multi-stage Docker build reduces image size
+* `wait-for-it.sh` ensures DB readiness
+* Docker Compose manages networking automatically
+
+---
+
+# 🚀 Future Enhancements
+
+* Add Redis caching
+* Add Nginx reverse proxy
+* CI/CD using Jenkins
+* Kubernetes deployment
+
+---
+
+# 👨‍💻 Author
+
+Suprit Ambig
